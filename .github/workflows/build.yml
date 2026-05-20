@@ -1,0 +1,69 @@
+name: Build DeepSeek-PP
+
+# 触发条件：推送到主分支、PR，或者在 Actions 页面手动点击触发
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch: 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉取仓库代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ==========================================
+      # 选项 A: 如果这是一个 C++ 项目 (例如 llama.cpp 的变种)
+      # ==========================================
+      - name: Set up C++ Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+          
+      - name: Build C++ Project
+        run: |
+          mkdir build && cd build
+          cmake ..
+          make -j$(nproc)
+
+      # ==========================================
+      # 选项 B: 如果你需要构建 Docker 镜像并导出 (按需取消注释)
+      # ==========================================
+      # - name: Build Docker Image
+      #   run: |
+      #     docker build -t deepseek-pp:latest .
+      #     docker save deepseek-pp:latest > deepseek-pp-image.tar
+      
+      # - name: Upload Docker Image Artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: deepseek-pp-docker
+      #     path: deepseek-pp-image.tar
+
+      # ==========================================
+      # 选项 C: 如果这是一个 Python 项目 (按需取消注释)
+      # ==========================================
+      # - name: Set up Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: '3.10'
+      # - name: Install dependencies and Build
+      #   run: |
+      #     python -m pip install --upgrade pip
+      #     pip install -r requirements.txt
+      #     # 执行你的构建或打包命令，例如：
+      #     # python setup.py build
+
+      # 2. 将构建好的产物（如编译好的二进制文件）上传，以便你下载
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepseek-pp-build
+          path: |
+            build/
+            # 在这里替换为你实际生成的二进制文件或打包文件的路径
