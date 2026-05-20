@@ -1,7 +1,7 @@
 name: Build & Package
 
 # 触发条件
-于:
+on:
   push:
     branches: [main]
   pull_request:
