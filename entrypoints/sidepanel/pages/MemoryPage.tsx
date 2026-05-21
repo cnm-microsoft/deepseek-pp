@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Memory, MemoryType } from '../../../core/types';
+import type { Memory, MemoryType, NewMemory } from '../../../core/types';
 import MemoryCard from '../components/MemoryCard';
 import MemoryForm from '../components/MemoryForm';
 import { MEMORY_TYPE_CONFIG } from '../constants';
@@ -50,7 +50,7 @@ export default function MemoryPage() {
     load();
   };
 
-  const handleSave = async (mem: Omit<Memory, 'id' | 'createdAt' | 'updatedAt' | 'accessCount' | 'lastAccessedAt'>) => {
+  const handleSave = async (mem: NewMemory) => {
     if (editingMemory?.id) {
       await chrome.runtime.sendMessage({
         type: 'UPDATE_MEMORY',
