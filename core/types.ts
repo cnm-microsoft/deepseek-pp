@@ -1,3 +1,14 @@
+import type {
+  AutomationCreateInput,
+  AutomationId,
+  AutomationRun,
+  AutomationRunId,
+  AutomationRunListOptions,
+  AutomationRunUpdateInput,
+  AutomationStatus,
+  AutomationUpdateInput,
+} from './automation/types';
+
 export type MemoryType = 'user' | 'feedback' | 'topic' | 'reference';
 
 export type ModelType = 'expert' | null;
@@ -24,6 +35,13 @@ export interface Memory {
   accessCount: number;
   lastAccessedAt: number;
 }
+
+export type NewMemory = Omit<
+  Memory,
+  'id' | 'syncId' | 'createdAt' | 'updatedAt' | 'accessCount' | 'lastAccessedAt'
+> & {
+  syncId?: string;
+};
 
 export interface SyncConfig {
   url: string;
@@ -56,6 +74,27 @@ export interface ToolCall {
   raw: string;
 }
 
+export interface ToolCardResult {
+  ok: boolean;
+  summary: string;
+  detail?: string;
+}
+
+export interface ToolExecutionRecord {
+  name: string;
+  result: ToolCardResult;
+}
+
+export interface ToolCallRestoreRecord {
+  id: string;
+  calls?: ToolCall[];
+  executions?: ToolExecutionRecord[];
+  content?: string;
+  source?: 'history' | 'storage';
+  url?: string;
+  createdAt?: number;
+}
+
 export interface SystemPromptPreset {
   id: string;
   name: string;
@@ -67,12 +106,13 @@ export interface SystemPromptPreset {
 export interface DeepSeekRequest {
   chat_session_id: string;
   model_type: string;
-  parent_message_id: string | null;
+  parent_message_id: number | null;
   preempt: boolean;
   prompt: string;
   ref_file_ids: string[];
   search_enabled: boolean;
   thinking_enabled: boolean;
+  action?: string;
 }
 
 export interface SSEEvent {
@@ -85,7 +125,7 @@ export type MessageAction =
   | { type: 'GET_MEMORIES' }
   | { type: 'GET_MEMORY_BY_ID'; payload: { id: number } }
   | { type: 'GET_SKILLS' }
-  | { type: 'SAVE_MEMORY'; payload: Omit<Memory, 'id' | 'createdAt' | 'updatedAt' | 'accessCount' | 'lastAccessedAt'> }
+  | { type: 'SAVE_MEMORY'; payload: NewMemory }
   | { type: 'DELETE_MEMORY'; payload: { id: number } }
   | { type: 'UPDATE_MEMORY'; payload: Memory }
   | { type: 'SAVE_SKILL'; payload: Skill }
@@ -95,6 +135,17 @@ export type MessageAction =
   | { type: 'DELETE_PRESET'; payload: { id: string } }
   | { type: 'SET_ACTIVE_PRESET'; payload: { id: string | null } }
   | { type: 'GET_ACTIVE_PRESET' }
+  | { type: 'GET_AUTOMATIONS' }
+  | { type: 'GET_AUTOMATION'; payload: { id: AutomationId } }
+  | { type: 'CREATE_AUTOMATION'; payload: AutomationCreateInput }
+  | { type: 'UPDATE_AUTOMATION'; payload: { id: AutomationId; patch: AutomationUpdateInput } }
+  | { type: 'DELETE_AUTOMATION'; payload: { id: AutomationId } }
+  | { type: 'SET_AUTOMATION_STATUS'; payload: { id: AutomationId; status: AutomationStatus } }
+  | { type: 'RUN_AUTOMATION_NOW'; payload: { id: AutomationId } }
+  | { type: 'GET_AUTOMATION_RUNS'; payload: AutomationRunListOptions }
+  | { type: 'GET_AUTOMATION_RUN'; payload: { id: AutomationRunId } }
+  | { type: 'APPEND_AUTOMATION_RUN'; payload: AutomationRun }
+  | { type: 'UPDATE_AUTOMATION_RUN'; payload: { id: AutomationRunId; patch: AutomationRunUpdateInput } }
   | { type: 'GET_CONFIG' }
   | { type: 'GET_MODEL_TYPE' }
   | { type: 'SET_MODEL_TYPE'; payload: ModelType }

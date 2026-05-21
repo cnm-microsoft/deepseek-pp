@@ -1,4 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  DEFAULT_BACKGROUND_OPACITY,
+  clampBackgroundOpacity,
+  normalizeBackgroundConfig,
+} from '../../../core/background/config';
 import type { BackgroundConfig, Memory, SyncConfig } from '../../../core/types';
 import { SVG_PATHS } from '../constants';
 
@@ -8,6 +13,14 @@ const DEFAULT_SYNC_CONFIG: SyncConfig = {
   password: '',
   remotePath: 'DeepSeekPP',
   lastSyncAt: null,
+};
+
+const DEFAULT_BACKGROUND_CONFIG: BackgroundConfig = {
+  enabled: false,
+  type: 'upload',
+  url: '',
+  imageData: '',
+  opacity: DEFAULT_BACKGROUND_OPACITY,
 };
 
 type SyncStatus = 'idle' | 'testing' | 'syncing' | 'success' | 'error';
@@ -23,11 +36,20 @@ export default function SettingsPage() {
   const [bgType, setBgType] = useState<'upload' | 'url'>('upload');
   const [bgUrl, setBgUrl] = useState('');
   const [bgImageData, setBgImageData] = useState('');
-  const [bgOpacity, setBgOpacity] = useState(0.3);
+  const [bgOpacity, setBgOpacity] = useState(DEFAULT_BACKGROUND_OPACITY);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const opacitySaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const bgConfigRef = useRef<BackgroundConfig>(DEFAULT_BACKGROUND_CONFIG);
 
   const bgPreview = bgType === 'url' ? bgUrl : bgImageData;
+
+  const syncBgState = (config: BackgroundConfig) => {
+    bgConfigRef.current = config;
+    setBgEnabled(config.enabled);
+    setBgType(config.type);
+    setBgUrl(config.url ?? '');
+    setBgImageData(config.imageData ?? '');
+    setBgOpacity(config.opacity);
+  };
 
   useEffect(() => {
     chrome.runtime.sendMessage({ type: 'GET_MEMORIES' }).then((list: Memory[]) => {
@@ -43,12 +65,8 @@ export default function SettingsPage() {
       setExpertMode(val === 'expert');
     });
     chrome.runtime.sendMessage({ type: 'GET_BACKGROUND' }).then((cfg: BackgroundConfig | null) => {
-      if (!cfg) return;
-      setBgEnabled(cfg.enabled);
-      setBgType(cfg.type);
-      setBgUrl(cfg.url ?? '');
-      setBgImageData(cfg.imageData ?? '');
-      setBgOpacity(cfg.opacity);
+      const normalized = normalizeBackgroundConfig(cfg);
+      if (normalized) syncBgState(normalized);
     });
   }, []);
 
@@ -61,13 +79,12 @@ export default function SettingsPage() {
   };
 
   const saveBgConfig = async (patch: Partial<BackgroundConfig>) => {
-    const config: BackgroundConfig = {
-      enabled: patch.enabled ?? bgEnabled,
-      type: patch.type ?? bgType,
-      url: patch.url ?? bgUrl,
-      imageData: patch.imageData ?? bgImageData,
-      opacity: patch.opacity ?? bgOpacity,
-    };
+    const config = normalizeBackgroundConfig({
+      ...bgConfigRef.current,
+      ...patch,
+    });
+    if (!config) return;
+    bgConfigRef.current = config;
     await chrome.runtime.sendMessage({ type: 'SAVE_BACKGROUND', payload: config });
   };
 
@@ -114,6 +131,13 @@ export default function SettingsPage() {
     setBgType('upload');
     setBgImageData(data);
     setBgEnabled(true);
+    bgConfigRef.current = {
+      ...bgConfigRef.current,
+      enabled: true,
+      type: 'upload',
+      imageData: data,
+      url: '',
+    };
     await saveBgConfig({ enabled: true, type: 'upload', imageData: data, url: '' });
     e.target.value = '';
   };
@@ -123,13 +147,24 @@ export default function SettingsPage() {
     setBgType('url');
     setBgImageData('');
     setBgEnabled(true);
+    bgConfigRef.current = {
+      ...bgConfigRef.current,
+      enabled: true,
+      type: 'url',
+      url: bgUrl,
+      imageData: '',
+    };
     await saveBgConfig({ enabled: true, type: 'url', url: bgUrl, imageData: '' });
   };
 
   const handleOpacityChange = (val: number) => {
-    setBgOpacity(val);
-    clearTimeout(opacitySaveTimer.current);
-    opacitySaveTimer.current = setTimeout(() => saveBgConfig({ opacity: val }), 200);
+    const opacity = clampBackgroundOpacity(val);
+    setBgOpacity(opacity);
+    bgConfigRef.current = {
+      ...bgConfigRef.current,
+      opacity,
+    };
+    void saveBgConfig({ opacity });
   };
 
   const handleClearBg = async () => {
@@ -137,7 +172,8 @@ export default function SettingsPage() {
     setBgType('upload');
     setBgUrl('');
     setBgImageData('');
-    setBgOpacity(0.3);
+    setBgOpacity(DEFAULT_BACKGROUND_OPACITY);
+    bgConfigRef.current = DEFAULT_BACKGROUND_CONFIG;
     await chrome.runtime.sendMessage({ type: 'CLEAR_BACKGROUND' });
   };
 

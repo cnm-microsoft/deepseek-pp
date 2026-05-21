@@ -4,16 +4,18 @@ import { BUILTIN_SKILLS } from './builtin';
 const STORAGE_KEY = 'deepseek_pp_skills';
 
 export async function getAllSkills(): Promise<Skill[]> {
-  const data = await chrome.storage.local.get(STORAGE_KEY);
-  const custom: Skill[] = (data[STORAGE_KEY] ?? []).filter(
+  const data = await chrome.storage.local.get(STORAGE_KEY) as Record<string, unknown>;
+  const storedSkills = data[STORAGE_KEY];
+  const custom: Skill[] = (Array.isArray(storedSkills) ? storedSkills : []).filter(
     (s: Skill) => s.source === 'custom',
   );
   return [...BUILTIN_SKILLS, ...custom];
 }
 
 export async function saveSkill(skill: Skill): Promise<void> {
-  const stored = await chrome.storage.local.get(STORAGE_KEY);
-  const custom: Skill[] = (stored[STORAGE_KEY] ?? []).filter(
+  const stored = await chrome.storage.local.get(STORAGE_KEY) as Record<string, unknown>;
+  const storedSkills = stored[STORAGE_KEY];
+  const custom: Skill[] = (Array.isArray(storedSkills) ? storedSkills : []).filter(
     (s: Skill) => s.source === 'custom',
   );
   const idx = custom.findIndex((s) => s.name === skill.name);
@@ -26,8 +28,9 @@ export async function saveSkill(skill: Skill): Promise<void> {
 }
 
 export async function deleteSkill(name: string): Promise<void> {
-  const stored = await chrome.storage.local.get(STORAGE_KEY);
-  const custom: Skill[] = (stored[STORAGE_KEY] ?? []).filter(
+  const stored = await chrome.storage.local.get(STORAGE_KEY) as Record<string, unknown>;
+  const storedSkills = stored[STORAGE_KEY];
+  const custom: Skill[] = (Array.isArray(storedSkills) ? storedSkills : []).filter(
     (s: Skill) => s.name !== name,
   );
   await chrome.storage.local.set({ [STORAGE_KEY]: custom });

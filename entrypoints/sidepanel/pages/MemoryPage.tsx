@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Memory, MemoryType } from '../../../core/types';
+import type { Memory, MemoryType, NewMemory } from '../../../core/types';
 import MemoryCard from '../components/MemoryCard';
 import MemoryForm from '../components/MemoryForm';
 import { MEMORY_TYPE_CONFIG } from '../constants';
@@ -20,7 +20,28 @@ export default function MemoryPage() {
     setMemories(list ?? []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    void load();
+
+    const handleStateUpdate = (message: { type?: string; memories?: Memory[] }) => {
+      if (message.type === 'STATE_UPDATED' && Array.isArray(message.memories)) {
+        setMemories(message.memories);
+      }
+    };
+    const refreshWhenVisible = () => {
+      if (!document.hidden) void load();
+    };
+
+    chrome.runtime.onMessage.addListener(handleStateUpdate);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshWhenVisible);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleStateUpdate);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshWhenVisible);
+    };
+  }, []);
 
   const filtered = filter === 'all' ? memories : memories.filter((m) => m.type === filter);
 
@@ -29,7 +50,7 @@ export default function MemoryPage() {
     load();
   };
 
-  const handleSave = async (mem: Omit<Memory, 'id' | 'createdAt' | 'updatedAt' | 'accessCount' | 'lastAccessedAt'>) => {
+  const handleSave = async (mem: NewMemory) => {
     if (editingMemory?.id) {
       await chrome.runtime.sendMessage({
         type: 'UPDATE_MEMORY',

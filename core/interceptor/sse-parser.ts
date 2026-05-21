@@ -41,11 +41,31 @@ export function parseSSEData(data: string): unknown | null {
 }
 
 export function extractTextFromParsed(parsed: any): string | null {
-  if (typeof parsed.v === 'string') {
+  if (parsed?.o === 'BATCH' && Array.isArray(parsed.v)) {
+    const text = parsed.v
+      .map((item: unknown) => extractTextFromParsed(item))
+      .filter((part: string | null): part is string => part !== null)
+      .join('');
+    return text.length > 0 ? text : null;
+  }
+  // Format 1: {"v":"text"} — shorthand text append (no path)
+  if (!parsed.p && typeof parsed.v === 'string') {
     return parsed.v;
   }
+  // Format 2: {"p":"...", "o":"APPEND", "v":"text"} — explicit append
   if (parsed.p && parsed.o === 'APPEND' && typeof parsed.v === 'string') {
     return parsed.v;
+  }
+  // Format 3: {"p":"response/fragments/-1/content", "v":"text"} — content set (no "o" field)
+  if (parsed.p && typeof parsed.p === 'string' && parsed.p.endsWith('/content') && typeof parsed.v === 'string' && !parsed.o) {
+    return parsed.v;
+  }
+  // Format 4: {"p":"response/fragments", "o":"APPEND", "v":[{content:"text",...}]} — new fragment with initial content
+  if (parsed.p === 'response/fragments' && parsed.o === 'APPEND' && Array.isArray(parsed.v)) {
+    const frag = parsed.v[0];
+    if (frag && typeof frag.content === 'string') {
+      return frag.content;
+    }
   }
   return null;
 }

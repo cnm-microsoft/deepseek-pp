@@ -4,8 +4,9 @@ const STORAGE_KEY = 'deepseek_pp_presets';
 const ACTIVE_KEY = 'deepseek_pp_active_preset_id';
 
 export async function getAllPresets(): Promise<SystemPromptPreset[]> {
-  const data = await chrome.storage.local.get(STORAGE_KEY);
-  return data[STORAGE_KEY] ?? [];
+  const data = await chrome.storage.local.get(STORAGE_KEY) as Record<string, unknown>;
+  const presets = data[STORAGE_KEY];
+  return Array.isArray(presets) ? (presets as SystemPromptPreset[]) : [];
 }
 
 export async function savePreset(preset: SystemPromptPreset): Promise<void> {
@@ -31,8 +32,9 @@ export async function deletePreset(id: string): Promise<void> {
 }
 
 export async function getActivePresetId(): Promise<string | null> {
-  const data = await chrome.storage.local.get(ACTIVE_KEY);
-  return data[ACTIVE_KEY] ?? null;
+  const data = await chrome.storage.local.get(ACTIVE_KEY) as Record<string, unknown>;
+  const activeId = data[ACTIVE_KEY];
+  return typeof activeId === 'string' ? activeId : null;
 }
 
 export async function setActivePresetId(id: string | null): Promise<void> {

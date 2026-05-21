@@ -1,0 +1,66 @@
+name: Release Extension
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build zip package
+        run: npm run zip
+
+      - name: Locate package
+        id: package
+        shell: bash
+        run: |
+          ZIP_FILE="$(find dist -maxdepth 1 -type f -name '*.zip' | sort | head -n 1)"
+          if [ -z "$ZIP_FILE" ]; then
+            echo "No zip package found in dist/" >&2
+            exit 1
+          fi
+          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP_FILE: ${{ steps.package.outputs.zip_file }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          TAG="auto-${SHORT_SHA}"
+          TITLE="DeepSeek++ ${SHORT_SHA}"
+          NOTES="Automated extension build for commit ${GITHUB_SHA}."
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP_FILE" --clobber
+          else
+            gh release create "$TAG" "$ZIP_FILE" \
+              --target "$GITHUB_SHA" \
+              --title "$TITLE" \
+              --notes "$NOTES"
+          fi

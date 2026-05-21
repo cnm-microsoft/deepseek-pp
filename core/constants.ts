@@ -8,6 +8,9 @@ export const MSG_PREFIX = 'DEEPSEEK_PP';
 
 export const DSML = '｜DSML｜';
 
+export const TOOL_NAMES = ['memory_save', 'memory_update', 'memory_delete'] as const;
+export type ToolName = typeof TOOL_NAMES[number];
+
 const MEMORY_SAVE_SCHEMA = '{"type": "function", "function": {"name": "memory_save", "description": "保存一条新的长期记忆", "parameters": {"type": "object", "properties": {"type": {"type": "string", "enum": ["user", "feedback", "topic", "reference"], "description": "记忆类型：user=身份角色偏好, feedback=行为纠正, topic=讨论要点, reference=外部资源链接"}, "name": {"type": "string", "description": "简短标题"}, "content": {"type": "string", "description": "要保存的内容"}, "tags": {"type": "array", "items": {"type": "string"}, "description": "标签列表"}}, "required": ["type", "name", "content", "tags"]}}}';
 
 export const MEMORY_UPDATE_SCHEMA = '{"type": "function", "function": {"name": "memory_update", "description": "更新已有记忆", "parameters": {"type": "object", "properties": {"id": {"type": "integer", "description": "记忆ID"}, "type": {"type": "string", "enum": ["user", "feedback", "topic", "reference"], "description": "记忆类型"}, "name": {"type": "string", "description": "更新后的标题"}, "content": {"type": "string", "description": "更新后的内容"}, "tags": {"type": "array", "items": {"type": "string"}, "description": "标签列表"}}, "required": ["id", "type", "name", "content", "tags"]}}}';
@@ -22,26 +25,27 @@ export const SYSTEM_TEMPLATE_CHAT = `## 角色
 
 ## Tools
 
-You have access to a set of tools to help answer the user's question. You can invoke tools by writing a "<｜DSML｜tool_calls>" block like the following:
+You have access to a set of tools. To call a tool, output an XML block with the tool name as the tag and a JSON object as the body, exactly like this:
 
-<｜DSML｜tool_calls>
-<｜DSML｜invoke name="$TOOL_NAME">
-<｜DSML｜parameter name="$PARAMETER_NAME" string="true|false">$PARAMETER_VALUE</｜DSML｜parameter>
-...
-</｜DSML｜invoke>
-</｜DSML｜tool_calls>
+<memory_save>
+{"type": "user", "name": "用户职业", "content": "前端开发", "tags": ["前端"]}
+</memory_save>
 
-String parameters should be specified as is and set \`string="true"\`. For all other types (numbers, booleans, arrays, objects), pass the value in JSON format and set \`string="false"\`.
+The JSON body MUST be valid JSON on its own. Do NOT add any other text inside the tags, only JSON. You can place tool calls anywhere in your reply (not only at the end).
 
-### Available Tool Schemas
+### Available Tools
 
 ${MEMORY_SAVE_SCHEMA}
+
+${MEMORY_UPDATE_SCHEMA}
+
+${MEMORY_DELETE_SCHEMA}
 
 You MUST strictly follow the above defined tool name and parameter schemas to invoke tool calls.
 
 ## 记忆保存规则
 
-当对话中出现以下任一情况时，你**必须**在回复末尾调用 memory_save 工具：
+当对话中出现以下任一情况时，你**必须**调用 memory_save 工具：
 - 用户提到自己的身份、职业、角色
 - 用户表达偏好、习惯或工作方式
 - 用户纠正你的回答方式或行为
@@ -55,17 +59,13 @@ You MUST strictly follow the above defined tool name and parameter schemas to in
 
 了解！React + TypeScript 是目前非常主流的前端技术栈。有任何相关问题都可以问我。
 
-<｜DSML｜tool_calls>
-<｜DSML｜invoke name="memory_save">
-<｜DSML｜parameter name="type" string="true">user</｜DSML｜parameter>
-<｜DSML｜parameter name="name" string="true">用户职业和技术栈</｜DSML｜parameter>
-<｜DSML｜parameter name="content" string="true">前端开发工程师，主要使用 React 和 TypeScript</｜DSML｜parameter>
-<｜DSML｜parameter name="tags" string="false">["前端", "React", "TypeScript"]</｜DSML｜parameter>
-</｜DSML｜invoke>
-</｜DSML｜tool_calls>
+<memory_save>
+{"type": "user", "name": "用户职业和技术栈", "content": "前端开发工程师，主要使用 React 和 TypeScript", "tags": ["前端", "React", "TypeScript"]}
+</memory_save>
 
 ### 规则
-- 先正常回答用户问题，工具调用块附在回复最末尾
+- 你可以在回复中的任何位置调用工具，不限于末尾
+- 工具调用后系统会自动执行并返回结果
 - 仅保存长期有价值的信息，不保存一次性的问答内容
 - 不要重复保存"已有记忆"中已存在的信息
 
@@ -77,26 +77,25 @@ export const SYSTEM_TEMPLATE_THINKING = `你具有长期记忆能力。已有记
 
 ## Tools
 
-You have access to a set of tools to help answer the user's question. You can invoke tools by writing a "<｜DSML｜tool_calls>" block like the following:
+You have access to a set of tools. To call a tool, output an XML block with the tool name as the tag and a JSON object as the body, exactly like this:
 
-<｜DSML｜tool_calls>
-<｜DSML｜invoke name="$TOOL_NAME">
-<｜DSML｜parameter name="$PARAMETER_NAME" string="true|false">$PARAMETER_VALUE</｜DSML｜parameter>
-...
-</｜DSML｜invoke>
-</｜DSML｜tool_calls>
+<memory_save>
+{"type": "user", "name": "用户职业", "content": "前端开发", "tags": ["前端"]}
+</memory_save>
 
-String parameters should be specified as is and set \`string="true"\`. For all other types (numbers, booleans, arrays, objects), pass the value in JSON format and set \`string="false"\`.
+The JSON body MUST be valid JSON on its own. Do NOT add any other text inside the tags, only JSON.
 
-You MUST output your complete reasoning inside <think>...</think> BEFORE any tool calls or final response.
-
-### Available Tool Schemas
+### Available Tools
 
 ${MEMORY_SAVE_SCHEMA}
 
+${MEMORY_UPDATE_SCHEMA}
+
+${MEMORY_DELETE_SCHEMA}
+
 You MUST strictly follow the above defined tool name and parameter schemas to invoke tool calls.
 
-当用户透露重要的持久信息（身份、偏好、行为纠正、重要决策）时，你**必须**在回复末尾调用 memory_save 工具保存。仅保存长期有价值的信息；不要重复保存已有记忆。
+当用户透露重要的持久信息（身份、偏好、行为纠正、重要决策）时，你**必须**调用 memory_save 工具保存。你可以在回复中的任何位置调用工具。仅保存长期有价值的信息；不要重复保存已有记忆。
 
 ---
 
@@ -118,8 +117,7 @@ export const STOP_WORDS = new Set([
   'other', 'been', 'has', 'its', 'use', 'two', 'how', 'our', 'way',
 ]);
 
-export const TOOL_CALLS_BLOCK_REGEX = /<｜DSML｜tool_calls>\s*[\s\S]*?\s*<\/｜DSML｜tool_calls>/g;
-export const INVOKE_REGEX = /<｜DSML｜invoke name="([^"]+)">\s*([\s\S]*?)\s*<\/｜DSML｜invoke>/g;
-export const PARAMETER_REGEX = /<｜DSML｜parameter name="([^"]+)" string="(true|false)">([\s\S]*?)<\/｜DSML｜parameter>/g;
+// XML-style tool call regex: <tool_name>JSON</tool_name>
+export const TOOL_CALL_REGEX = /<(memory_save|memory_update|memory_delete)>\s*([\s\S]*?)\s*<\/\1>/g;
 
 export const SKILL_TRIGGER_REGEX = /^\/(\S+)\s*([\s\S]*)$/;
